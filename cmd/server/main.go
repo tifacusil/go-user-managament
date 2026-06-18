@@ -62,7 +62,11 @@ func run(cfg config.Config, logger *slog.Logger, instanceID string) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.Warn("db close", "err", err)
+		}
+	}()
 
 	userRepo := repository.NewUserRepository(db)
 	subRepo := repository.NewSubscriptionRepository(db)

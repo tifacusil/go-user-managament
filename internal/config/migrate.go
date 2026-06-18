@@ -16,7 +16,7 @@ func MigrateUp(c Config) error {
 	if err != nil {
 		return fmt.Errorf("open root conn: %w", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	goose.SetBaseFS(migrations.FS)
 	if err := goose.SetDialect("mysql"); err != nil {

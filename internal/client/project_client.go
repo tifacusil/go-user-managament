@@ -67,7 +67,7 @@ func (c *ProjectClient) checkProject(ctx context.Context, projectID string) erro
 	if err != nil {
 		return fmt.Errorf("http get: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrProjectNotFound
