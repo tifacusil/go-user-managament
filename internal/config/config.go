@@ -46,6 +46,10 @@ type Config struct {
 	ProjectManagementURL string
 
 	GRPCAddr string
+
+	SeedOnStartup     bool
+	SeedAdminPassword string
+	SeedUserPassword  string
 }
 
 func Load() Config {
@@ -82,6 +86,10 @@ func Load() Config {
 		ProjectManagementURL: env("PROJECT_MANAGEMENT_URL", "http://project-management-1:8080"),
 
 		GRPCAddr: env("GRPC_ADDR", ":9090"),
+
+		SeedOnStartup:     envBool("SEED_ON_STARTUP", false),
+		SeedAdminPassword: env("SEED_ADMIN_PASSWORD", ""),
+		SeedUserPassword:  env("SEED_USER_PASSWORD", ""),
 	}
 }
 

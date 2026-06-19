@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/tifacusil/go-user-management/internal/client"
+	appseed "github.com/tifacusil/go-user-management/internal/seed"
 	"github.com/tifacusil/go-user-management/internal/config"
 	"github.com/tifacusil/go-user-management/internal/discovery"
 	appgrpc "github.com/tifacusil/go-user-management/internal/grpc"
@@ -74,6 +75,13 @@ func run(cfg config.Config, logger *slog.Logger, instanceID string) error {
 	projectClient := client.NewProjectClient(cfg.ProjectManagementURL)
 
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHours)
+
+	if cfg.SeedOnStartup {
+		appseed.Run(ctx, authSvc, userRepo, subRepo, appseed.Options{
+			AdminPassword: cfg.SeedAdminPassword,
+			UserPassword:  cfg.SeedUserPassword,
+		})
+	}
 	userSvc := service.NewUserService(userRepo)
 	subSvc := service.NewSubscriptionService(subRepo, projectClient)
 	deviceSvc := service.NewDeviceService(deviceRepo)
