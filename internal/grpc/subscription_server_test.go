@@ -56,7 +56,9 @@ func newTestClient(t *testing.T, srvImpl *SubscriptionServer) subpb.Subscription
 		t.Fatalf("dial: %v", err)
 	}
 	t.Cleanup(func() {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			t.Errorf("close conn: %v", err)
+		}
 		gsrv.Stop()
 	})
 	return subpb.NewSubscriptionServiceClient(conn)
