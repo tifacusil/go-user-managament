@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+// user-management: notification subscriptions consumed by early-warning to
+// resolve target FCM tokens. Contract owned by the consumer (early-warning);
+// this provider serves it. Keep in sync with go-early-warning's
+// contracts/proto/usermanagement/v1/usermanagement.proto.
+package usermanagement.v1;
+
+option go_package = "github.com/tifacusil/go-user-management/internal/grpc/usermanagementpb;usermanagementv1";
+
+// SubscriptionService lists subscriptions by project.
+service SubscriptionService {
+  rpc GetSubscriptions(GetSubscriptionsRequest) returns (GetSubscriptionsResponse);
+}
+
+message GetSubscriptionsRequest {
+  string project_id = 1;
+}
+
+message GetSubscriptionsResponse {
+  repeated Subscription subscriptions = 1;
+}
+
+message Subscription {
+  string id = 1;
+  string project_id = 2;
+  bool push_enabled = 3;
+  string min_alert_level = 4;     // "blue" | "orange" | "red"
+  string quiet_hours_start = 5;   // "HH:MM:SS" (empty = no quiet hours)
+  string quiet_hours_end = 6;
+  repeated string fcm_tokens = 7;
+}

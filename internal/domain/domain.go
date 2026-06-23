@@ -49,6 +49,7 @@ type UserProjectAlertSubscription struct {
 
 // RecipientRow is the result of the gRPC alert-recipients join query.
 type RecipientRow struct {
+	ID              int64   `db:"id"`
 	UserID          int64   `db:"user_id"`
 	Email           string  `db:"email"`
 	PhoneE164       string  `db:"phone_e164"`

@@ -24,7 +24,7 @@ import (
 	"github.com/tifacusil/go-user-management/internal/config"
 	"github.com/tifacusil/go-user-management/internal/discovery"
 	appgrpc "github.com/tifacusil/go-user-management/internal/grpc"
-	pb "github.com/tifacusil/go-user-management/internal/grpc/alertrecipientpb"
+	subpb "github.com/tifacusil/go-user-management/internal/grpc/usermanagementpb"
 	"github.com/tifacusil/go-user-management/internal/handler"
 	appmiddleware "github.com/tifacusil/go-user-management/internal/middleware"
 	"github.com/tifacusil/go-user-management/internal/observability"
@@ -138,7 +138,7 @@ func run(cfg config.Config, logger *slog.Logger, instanceID string) error {
 	}
 
 	grpcSrv := googlegrpc.NewServer()
-	pb.RegisterAlertRecipientServiceServer(grpcSrv, appgrpc.NewAlertRecipientServer(subRepo, deviceRepo))
+	subpb.RegisterSubscriptionServiceServer(grpcSrv, appgrpc.NewSubscriptionServer(subRepo, deviceRepo))
 
 	serveErr := make(chan error, 1)
 	go func() {

@@ -26,7 +26,7 @@ Nginx :80
 
 early-warning-service
   └── gRPC  →  :9090  (internal, bypasses Nginx)
-                   └── AlertRecipientService/GetRecipients
+                   └── SubscriptionService/GetSubscriptions
 ```
 
 Consul is used for service discovery and health checking. Prometheus metrics are exposed at `/metrics`.
@@ -35,11 +35,10 @@ Consul is used for service discovery and health checking. Prometheus metrics are
 
 | Technique | Where |
 |---|---|
-| **gRPC** | `AlertRecipientService` on `:9090` — queried by early-warning at alert dispatch |
+| **gRPC** | `SubscriptionService` on `:9090` — queried by early-warning at alert dispatch |
 | **Docker** | Multi-stage Dockerfile, published to GHCR via CD |
 | **CI/CD** | GitHub Actions: build → vet → unit → integration → lint → image push |
 | **Circuit Breaker** | Outbound call to project-management when creating subscriptions (sony/gobreaker) |
-| **CDCT** | pact-go consumer contract for `GetRecipients` gRPC interface |
 
 ## Project structure
 
@@ -54,14 +53,13 @@ internal/
   middleware/        JWT middleware + context helpers
   client/            HTTP client for project-management with circuit breaker
   grpc/              gRPC server implementation + generated pb files
-    alertrecipientpb/  generated protobuf Go code
+    usermanagementpb/  generated protobuf Go code
   observability/     structured slog logger + Prometheus metrics middleware
   discovery/         Consul register/deregister
 migrations/          goose SQL migrations (embedded)
 proto/               .proto source definitions
 test/
   integration/       Testcontainers integration tests (requires Docker)
-  cdct/              pact-go consumer-driven contract tests
 ```
 
 ## Running locally
@@ -175,21 +173,31 @@ If a token is already registered to another user, it is silently transferred (ow
 
 ### Internal gRPC
 
-`AlertRecipientService.GetRecipients` — called by the early-warning service at alert dispatch time.
+`SubscriptionService.GetSubscriptions` — called by the early-warning service at alert dispatch time.
+Contract is owned by the consumer (early-warning); this service implements it.
 
 ```protobuf
-rpc GetRecipients(GetRecipientsRequest) returns (GetRecipientsResponse);
+rpc GetSubscriptions(GetSubscriptionsRequest) returns (GetSubscriptionsResponse);
 
-message GetRecipientsRequest {
-  string project_id  = 1;
-  string alert_level = 2; // "blue" | "orange" | "red"
+message GetSubscriptionsRequest {
+  string project_id = 1;
+}
+
+message Subscription {
+  string id = 1;
+  string project_id = 2;
+  bool push_enabled = 3;
+  string min_alert_level = 4;     // "blue" | "orange" | "red"
+  string quiet_hours_start = 5;   // "HH:MM:SS"
+  string quiet_hours_end = 6;
+  repeated string fcm_tokens = 7;
 }
 ```
 
-**Alert level rules:**
-- Subscription with `min_alert_level=orange` is not notified on a `blue` alert
-- Red alerts bypass quiet hours entirely
-- Quiet hours support midnight-crossing windows (e.g. `22:00–06:00`)
+Returns **all** subscriptions for the project plus their active FCM tokens. The
+early-warning consumer applies the filtering itself: `push_enabled`,
+`min_alert_level` vs. incoming level, and quiet hours (red alerts bypass quiet
+hours, midnight-crossing windows supported).
 
 ## Configuration
 
@@ -224,19 +232,15 @@ make test
 
 # Integration tests (requires Docker)
 make test-integration
-
-# Consumer-driven contract tests (requires pact-go native lib)
-make test-contract
 ```
 
 ### Test pyramid
 
 | Layer | What | Command |
 |---|---|---|
-| Unit | `isQuietHour` logic, alert level rank | `make test` |
 | Routing | JWT middleware (6 cases: missing, wrong scheme, malformed, expired, wrong secret, valid) | `make test` |
+| gRPC | `GetSubscriptions` over bufconn: row/token mapping, nil quiet hours, empty project_id, repo error, no subs | `make test` |
 | Integration | Register → login → get profile, duplicate, wrong password, cross-user 403 | `make test-integration` |
-| CDCT | pact-go consumer contract for `GetRecipients` gRPC | `make test-contract` |
 
 ## CI/CD
 

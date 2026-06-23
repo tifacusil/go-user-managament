@@ -38,7 +38,7 @@ func (r *SubscriptionRepository) Create(ctx context.Context, s *domain.UserProje
 // Used by the gRPC alert-recipients server.
 func (r *SubscriptionRepository) ListByProjectID(ctx context.Context, projectID string) ([]domain.RecipientRow, error) {
 	const q = `
-		SELECT s.user_id, u.email, u.phone_e164,
+		SELECT s.id, s.user_id, u.email, u.phone_e164,
 		       s.min_alert_level, s.sms_enabled, s.push_enabled, s.email_enabled,
 		       s.quiet_hours_start, s.quiet_hours_end
 		FROM user_project_alert_subscription s
