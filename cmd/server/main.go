@@ -23,6 +23,7 @@ import (
 	appseed "github.com/tifacusil/go-user-management/internal/seed"
 	"github.com/tifacusil/go-user-management/internal/config"
 	"github.com/tifacusil/go-user-management/internal/discovery"
+	"github.com/tifacusil/go-user-management/internal/docs"
 	appgrpc "github.com/tifacusil/go-user-management/internal/grpc"
 	subpb "github.com/tifacusil/go-user-management/internal/grpc/usermanagementpb"
 	"github.com/tifacusil/go-user-management/internal/handler"
@@ -100,6 +101,11 @@ func run(cfg config.Config, logger *slog.Logger, instanceID string) error {
 	r.Use(chimiddleware.Recoverer)
 
 	r.Handle("/metrics", metrics.Handler())
+
+	// Swagger UI + spec: GET /api/v1/users/docs (UI), /api/v1/users/docs/openapi.yaml.
+	// El gateway nginx enruta /api/v1/users/ SIN rewrite, así que el path público
+	// coincide con el montaje aquí.
+	r.Mount("/api/v1/users/docs", docs.Routes())
 
 	r.Route("/api/v1/users", func(r chi.Router) {
 		r.Post("/register", authH.Register)
