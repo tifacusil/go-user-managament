@@ -28,7 +28,7 @@ func UnaryServerLogger(base *slog.Logger) grpc.UnaryServerInterceptor {
 		level := slog.LevelInfo
 		switch code {
 		case codes.OK:
-			level = slog.LevelInfo
+			// keep INFO
 		case codes.Internal, codes.Unknown, codes.DataLoss, codes.Unavailable:
 			level = slog.LevelError
 		default:

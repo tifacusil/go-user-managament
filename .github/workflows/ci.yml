@@ -3,7 +3,6 @@ name: CI — Build, test & lint
 on:
   push:
     branches: [main]
-  pull_request:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -45,6 +44,7 @@ jobs:
 
   lint:
     name: golangci-lint
+    needs: build-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
