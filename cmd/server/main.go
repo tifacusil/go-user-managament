@@ -97,6 +97,7 @@ func run(cfg config.Config, logger *slog.Logger, instanceID string) error {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(observability.RequestLogger(logger))
+	r.Use(observability.AccessLogger(cfg.HealthPath))
 	r.Use(metrics.Middleware)
 	r.Use(chimiddleware.Recoverer)
 
@@ -144,7 +145,9 @@ func run(cfg config.Config, logger *slog.Logger, instanceID string) error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	grpcSrv := googlegrpc.NewServer()
+	grpcSrv := googlegrpc.NewServer(
+		googlegrpc.UnaryInterceptor(observability.UnaryServerLogger(logger)),
+	)
 	subpb.RegisterSubscriptionServiceServer(grpcSrv, appgrpc.NewSubscriptionServer(subRepo, deviceRepo))
 
 	serveErr := make(chan error, 1)
