@@ -107,3 +107,16 @@ func (h *DeviceHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// POST /api/v1/users/logout
+//
+// Revokes all active device tokens for the authenticated caller. The JWT itself
+// stays valid until expiry — the client discards it after this returns.
+func (h *DeviceHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	callerID := appmiddleware.UserIDFromContext(r.Context())
+	if err := h.devices.Logout(r.Context(), callerID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to log out")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+

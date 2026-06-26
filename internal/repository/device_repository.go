@@ -85,3 +85,14 @@ func (r *DeviceRepository) Revoke(ctx context.Context, id, userID int64) error {
 	}
 	return nil
 }
+
+// RevokeAllByUserID revokes every active device for a user. Used on logout.
+// Idempotent: revoking when no active devices exist is not an error.
+func (r *DeviceRepository) RevokeAllByUserID(ctx context.Context, userID int64) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE user_device SET status = 'revoked' WHERE user_id = ? AND status = 'active'`, userID)
+	if err != nil {
+		return fmt.Errorf("revoke all devices: %w", err)
+	}
+	return nil
+}

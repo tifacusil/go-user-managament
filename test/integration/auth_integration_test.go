@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -70,10 +71,13 @@ func setupTestServer(t *testing.T) (*httptest.Server, func()) {
 	}
 
 	userRepo := repository.NewUserRepository(db)
+	deviceRepo := repository.NewDeviceRepository(db)
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHours)
 	userSvc := service.NewUserService(userRepo)
+	deviceSvc := service.NewDeviceService(deviceRepo)
 	authH := handler.NewAuthHandler(authSvc)
 	userH := handler.NewUserHandler(userSvc)
+	deviceH := handler.NewDeviceHandler(deviceSvc)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
@@ -82,8 +86,11 @@ func setupTestServer(t *testing.T) (*httptest.Server, func()) {
 		r.Post("/login", authH.Login)
 		r.Group(func(r chi.Router) {
 			r.Use(appmiddleware.JWT([]byte(cfg.JWTSecret)))
+			r.Post("/logout", deviceH.Logout)
 			r.Get("/{id}", userH.GetUser)
 			r.Put("/{id}", userH.UpdateUser)
+			r.Post("/{id}/devices", deviceH.Register)
+			r.Get("/{id}/devices", deviceH.List)
 		})
 	})
 
@@ -206,4 +213,90 @@ func TestForbiddenAccessOtherUser(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("cross-user access: got %d, want 403", resp.StatusCode)
 	}
+}
+
+func TestLogoutRevokesDevices(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	// Register + login.
+	http.Post(srv.URL+"/api/v1/users/register", "application/json",
+		bytes.NewBufferString(`{"username":"dave","email":"dave@example.com","password":"password123"}`))
+	loginResp, _ := http.Post(srv.URL+"/api/v1/users/login", "application/json",
+		bytes.NewBufferString(`{"username":"dave","password":"password123"}`))
+	var lr map[string]any
+	json.NewDecoder(loginResp.Body).Decode(&lr)
+	loginResp.Body.Close()
+	token := lr["token"].(string)
+	userID := int64(lr["user_id"].(float64))
+
+	authed := func(method, path, body string) *http.Response {
+		var r io.Reader
+		if body != "" {
+			r = bytes.NewBufferString(body)
+		}
+		req, _ := http.NewRequest(method, srv.URL+path, r)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+
+	// Register two devices.
+	for _, tok := range []string{"fcm-token-a", "fcm-token-b"} {
+		resp := authed(http.MethodPost, fmt.Sprintf("/api/v1/users/%d/devices", userID),
+			fmt.Sprintf(`{"device_token":%q,"platform":"android"}`, tok))
+		if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+			t.Fatalf("register device %s: got %d", tok, resp.StatusCode)
+		}
+		resp.Body.Close()
+	}
+
+	// Two active devices present.
+	if n := activeDeviceCount(t, authed, userID); n != 2 {
+		t.Fatalf("before logout: got %d active devices, want 2", n)
+	}
+
+	// Logout → 204.
+	resp := authed(http.MethodPost, "/api/v1/users/logout", "")
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("logout: got %d, want 204", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// All devices revoked → none active.
+	if n := activeDeviceCount(t, authed, userID); n != 0 {
+		t.Errorf("after logout: got %d active devices, want 0", n)
+	}
+
+	// JWT still valid after logout (only the device tokens are revoked).
+	resp = authed(http.MethodGet, fmt.Sprintf("/api/v1/users/%d", userID), "")
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("profile after logout: got %d, want 200 (JWT must stay valid)", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Logout again is idempotent → still 204.
+	resp = authed(http.MethodPost, "/api/v1/users/logout", "")
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("second logout: got %d, want 204 (idempotent)", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
+func activeDeviceCount(t *testing.T, authed func(method, path, body string) *http.Response, userID int64) int {
+	t.Helper()
+	resp := authed(http.MethodGet, fmt.Sprintf("/api/v1/users/%d/devices", userID), "")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list devices: got %d, want 200", resp.StatusCode)
+	}
+	var out struct {
+		Devices []map[string]any `json:"devices"`
+	}
+	json.NewDecoder(resp.Body).Decode(&out)
+	return len(out.Devices)
 }

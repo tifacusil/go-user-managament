@@ -2,3 +2,7 @@
 *.env
 !*.env.example
 /vendor/
+
+# Local standalone dev compose (orchestration lives in go-tesis-infra)
+/docker-compose.yml
+/deploy/

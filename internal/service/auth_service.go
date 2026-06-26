@@ -46,8 +46,11 @@ type LoginInput struct {
 }
 
 type TokenResponse struct {
-	Token string       `json:"token"`
-	User  *domain.User `json:"user"`
+	Token     string    `json:"token"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	Role      string    `json:"role"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*domain.User, error) {
@@ -93,27 +96,34 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*TokenResponse,
 		return nil, ErrInvalidCredentials
 	}
 
-	token, err := s.signToken(u)
+	token, expiresAt, err := s.signToken(u)
 	if err != nil {
 		return nil, err
 	}
 
-	return &TokenResponse{Token: token, User: u}, nil
+	return &TokenResponse{
+		Token:     token,
+		UserID:    u.ID,
+		Username:  u.Username,
+		Role:      u.Role,
+		ExpiresAt: expiresAt,
+	}, nil
 }
 
-func (s *AuthService) signToken(u *domain.User) (string, error) {
+func (s *AuthService) signToken(u *domain.User) (string, time.Time, error) {
 	now := time.Now()
+	expiresAt := now.Add(time.Duration(s.jwtExpiryHours) * time.Hour)
 	claims := jwt.MapClaims{
 		"sub":  u.ID,
 		"usr":  u.Username,
 		"role": u.Role,
 		"iat":  now.Unix(),
-		"exp":  now.Add(time.Duration(s.jwtExpiryHours) * time.Hour).Unix(),
+		"exp":  expiresAt.Unix(),
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := tok.SignedString(s.jwtSecret)
 	if err != nil {
-		return "", fmt.Errorf("sign token: %w", err)
+		return "", time.Time{}, fmt.Errorf("sign token: %w", err)
 	}
-	return signed, nil
+	return signed, expiresAt, nil
 }
