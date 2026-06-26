@@ -71,3 +71,9 @@ func (s *DeviceService) Revoke(ctx context.Context, deviceID, callerID int64, ca
 	}
 	return s.devices.Revoke(ctx, deviceID, dev.UserID)
 }
+
+// Logout revokes all active device tokens for the caller. The JWT stays valid
+// until expiry — client discards it. Mirrors the Java AuthService.logout.
+func (s *DeviceService) Logout(ctx context.Context, userID int64) error {
+	return s.devices.RevokeAllByUserID(ctx, userID)
+}

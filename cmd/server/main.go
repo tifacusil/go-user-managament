@@ -113,6 +113,7 @@ func run(cfg config.Config, logger *slog.Logger, instanceID string) error {
 
 		r.Group(func(r chi.Router) {
 			r.Use(appmiddleware.JWT([]byte(cfg.JWTSecret)))
+			r.Post("/logout", deviceH.Logout)
 			r.Get("/{id}", userH.GetUser)
 			r.Put("/{id}", userH.UpdateUser)
 			r.Post("/{id}/subscriptions", subH.Create)
