@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 
 	"google.golang.org/grpc/codes"
@@ -43,6 +44,10 @@ func (s *SubscriptionServer) GetSubscriptions(ctx context.Context, req *subpb.Ge
 
 	rows, err := s.subs.ListByProjectID(ctx, req.ProjectId)
 	if err != nil {
+		slog.ErrorContext(ctx, "GetSubscriptions: query subscriptions failed",
+			slog.String("event", "grpc_get_subscriptions_failed"),
+			slog.String("project_id", req.ProjectId),
+			slog.String("err", err.Error()))
 		return nil, status.Errorf(codes.Internal, "query subscriptions: %v", err)
 	}
 
@@ -64,6 +69,10 @@ func (s *SubscriptionServer) GetSubscriptions(ctx context.Context, req *subpb.Ge
 		})
 	}
 
+	slog.InfoContext(ctx, "GetSubscriptions served",
+		slog.String("event", "grpc_get_subscriptions"),
+		slog.String("project_id", req.ProjectId),
+		slog.Int("subscription_count", len(subs)))
 	return &subpb.GetSubscriptionsResponse{Subscriptions: subs}, nil
 }
 
