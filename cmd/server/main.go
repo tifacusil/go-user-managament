@@ -146,7 +146,10 @@ func run(cfg config.Config, logger *slog.Logger, instanceID string) error {
 	}
 
 	grpcSrv := googlegrpc.NewServer(
-		googlegrpc.UnaryInterceptor(observability.UnaryServerLogger(logger)),
+		googlegrpc.ChainUnaryInterceptor(
+			observability.UnaryServerLogger(logger),
+			metrics.UnaryServerInterceptor(),
+		),
 	)
 	subpb.RegisterSubscriptionServiceServer(grpcSrv, appgrpc.NewSubscriptionServer(subRepo, deviceRepo))
 
