@@ -14,6 +14,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// httpBuckets son los cortes del histograma de latencia HTTP, compartidos por
+// los 4 servicios Go y alineados al SLO declarado en application.yml de los
+// servicios Spring (Sistema A): 5ms,10ms,25ms,50ms,100ms,250ms,500ms,1s, mas
+// 2.5s/5s para no perder resolucion en colas bajo carga. prometheus.DefBuckets
+// produciria percentiles no comparables contra Sistema A via histogram_quantile.
+var httpBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5}
+
 type Metrics struct {
 	reqTotal        *prometheus.CounterVec
 	reqDuration     *prometheus.HistogramVec
@@ -29,8 +36,8 @@ func NewMetrics() *Metrics {
 		}, []string{"method", "route", "status"}),
 		reqDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
-			Help:    "HTTP request latency. Default buckets cover p50..p99.",
-			Buckets: prometheus.DefBuckets,
+			Help:    "HTTP request latency, buckets aligned to System A's SLO -> comparable histogram_quantile percentiles.",
+			Buckets: httpBuckets,
 		}, []string{"method", "route", "status"}),
 		grpcReqTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "grpc_requests_total",
